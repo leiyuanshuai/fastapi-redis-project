@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "fastapi-redis-project"
+version = "0.1.0"
+description = "A production-ready FastAPI application with advanced Redis integration"
+authors = ["Your Name <your.email@example.com>"]
+package-mode = false
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.117.0"
+uvicorn = "^0.24.0"
+redis = "4.6.0"  # 兼容Redis 7.4.5
+pydantic-settings = "^2.1.0"
+loguru = "^0.7.2"
+backoff = "^2.2.1"
+orjson = "^3.9.10"
+python-dotenv = "^1.0.0"
+
+[poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+httpx = "^0.25.1"
+pytest-asyncio = "^0.21.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
