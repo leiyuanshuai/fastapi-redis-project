@@ -68,20 +68,16 @@ class RedisClient:
     @property
     def async_(self) -> Union[aredis.Redis, ARedisCluster]:
         """获取异步Redis客户端，自动重连"""
-        if not self._async_client or not self._is_connected():
+        if not self._async_client:
             logger.warning("Async Redis client not connected, reconnecting...")
             self._init_client()
         return self._async_client
 
     def _is_connected(self) -> bool:
         """检查客户端是否连接正常"""
-        try:
-            # 异步ping需要特殊处理
-            import asyncio
-            return asyncio.run(self._async_client.ping()) if self._async_client else False
-        except Exception as e:
-            logger.error(f"Redis connection check failed: {str(e)}")
-            return False
+        # 在FastAPI应用中，不要使用asyncio.run()，因为事件循环已经在运行
+        # 我们简单地检查客户端是否存在
+        return self._async_client is not None
 
     # ------------------------------
     # 重试装饰器
