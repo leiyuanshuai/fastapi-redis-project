@@ -264,6 +264,8 @@ class RedisClient:
             self,
             key: str,
             value: Any,
+            # expire = timedelta(days=1, hours=2, minutes=30)
+            # expire=timedelta(hours=1, minutes=30, seconds=45)
             expire: Optional[Union[int, timedelta]] = None,
             nx: bool = False,
             xx: bool = False,
@@ -294,7 +296,17 @@ class RedisClient:
             serialized_value = self._serialize(value)
 
             # 处理过期时间
-            ex = expire.total_seconds() if isinstance(expire, timedelta) else expire
+            ex = None
+            if expire is not None:
+                if isinstance(expire, timedelta):
+                    ex = expire.total_seconds()
+                else:
+                    ex = expire
+                
+                # 验证过期时间是否有效
+                if ex <= 0:
+                    logger.warning(f"Invalid expire time {expire} for key {key}, ignoring expire time")
+                    ex = None
 
             return await self.async_.set(
                 name=key,
@@ -304,6 +316,16 @@ class RedisClient:
                 xx=xx,
                 keepttl=keep_ttl
             )
+        except aredis.ResponseError as e:
+            if "READONLY" in str(e):
+                logger.error(f"Redis is in read-only mode. Cannot write to key {key}: {str(e)}")
+                raise Exception("Redis is configured as read-only replica. Write operations are not allowed.")
+            elif "invalid expire time" in str(e):
+                logger.error(f"Invalid expire time {expire} for key {key}: {str(e)}")
+                raise Exception(f"Invalid expire time {expire}. Expire time must be a positive number.")
+            else:
+                logger.error(f"Failed to async set key {key}: {str(e)}")
+                return False
         except Exception as e:
             logger.error(f"Failed to async set key {key}: {str(e)}")
             return False
@@ -426,6 +448,163 @@ class RedisClient:
         except Exception as e:
             logger.error(f"Failed to get TTL for key {key}: {str(e)}")
             return -2
+
+    @_async_retry_decorator
+    async def async_incr(self, key: str) -> int:
+        """
+        将键的值增1（异步）
+        
+        如果键不存在，则在执行操作前将其设置为0。
+        如果键的值不是整数，则返回错误。
+        
+        Args:
+            key: 键名
+            
+        Returns:
+            int: 增加后的值
+            
+        Raises:
+            Exception: 如果键的值不是整数
+        """
+        try:
+            return await self.async_.incr(key)
+        except Exception as e:
+            logger.error(f"Failed to increment key {key}: {str(e)}")
+            raise
+
+    @_async_retry_decorator
+    async def async_decr(self, key: str) -> int:
+        """
+        将键的值减1（异步）
+        
+        如果键不存在，则在执行操作前将其设置为0。
+        如果键的值不是整数，则返回错误。
+        
+        Args:
+            key: 键名
+            
+        Returns:
+            int: 减少后的值
+            
+        Raises:
+            Exception: 如果键的值不是整数
+        """
+        try:
+            return await self.async_.decr(key)
+        except Exception as e:
+            logger.error(f"Failed to decrement key {key}: {str(e)}")
+            raise
+
+    @_async_retry_decorator
+    async def async_incrby(self, key: str, increment: int) -> int:
+        """
+        将键的值增加指定的整数（异步）
+        
+        如果键不存在，则在执行操作前将其设置为0。
+        如果键的值不是整数，则返回错误。
+        
+        Args:
+            key: 键名
+            increment: 增量值
+            
+        Returns:
+            int: 增加后的值
+            
+        Raises:
+            Exception: 如果键的值不是整数
+        """
+        try:
+            return await self.async_.incrby(key, increment)
+        except Exception as e:
+            logger.error(f"Failed to increment key {key} by {increment}: {str(e)}")
+            raise
+
+    @_async_retry_decorator
+    async def async_decrby(self, key: str, decrement: int) -> int:
+        """
+        将键的值减少指定的整数（异步）
+        
+        如果键不存在，则在执行操作前将其设置为0。
+        如果键的值不是整数，则返回错误。
+        
+        Args:
+            key: 键名
+            decrement: 减量值
+            
+        Returns:
+            int: 减少后的值
+            
+        Raises:
+            Exception: 如果键的值不是整数
+        """
+        try:
+            return await self.async_.decrby(key, decrement)
+        except Exception as e:
+            logger.error(f"Failed to decrement key {key} by {decrement}: {str(e)}")
+            raise
+
+    @_async_retry_decorator
+    async def async_strlen(self, key: str) -> int:
+        """
+        获取键值的字符串长度（异步）
+        
+        如果键不存在，则返回0。
+        
+        Args:
+            key: 键名
+            
+        Returns:
+            int: 字符串长度
+        """
+        try:
+            return await self.async_.strlen(key)
+        except Exception as e:
+            logger.error(f"Failed to get string length for key {key}: {str(e)}")
+            return 0
+
+    @_async_retry_decorator
+    async def async_getrange(self, key: str, start: int, end: int) -> str:
+        """
+        获取键值字符串指定范围的子串（异步）
+        
+        如果键不存在，则返回空字符串。
+        负数偏移量表示从字符串末尾开始计算。
+        
+        Args:
+            key: 键名
+            start: 起始位置（包含）
+            end: 结束位置（包含）
+            
+        Returns:
+            str: 子字符串
+        """
+        try:
+            return await self.async_.getrange(key, start, end)
+        except Exception as e:
+            logger.error(f"Failed to get range for key {key}: {str(e)}")
+            return ""
+
+    @_async_retry_decorator
+    async def async_setrange(self, key: str, offset: int, value: str) -> int:
+        """
+        从指定偏移量开始覆写键值字符串（异步）
+        
+        如果键不存在，则在执行操作前将其设置为空字符串。
+        如果偏移量超出字符串长度，则用零字节填充。
+        
+        Args:
+            key: 键名
+            offset: 偏移量
+            value: 要设置的值
+            
+        Returns:
+            int: 修改后字符串的长度
+        """
+        try:
+            return await self.async_.setrange(key, offset, value)
+        except Exception as e:
+            logger.error(f"Failed to set range for key {key}: {str(e)}")
+            raise
 
     # ------------------------------
     # Hash 类型操作 - 异步版
