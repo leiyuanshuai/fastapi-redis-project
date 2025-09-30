@@ -714,6 +714,179 @@ class RedisClient:
             logger.error(f"Failed to hdel for hash {name}, keys {keys}: {str(e)}")
             return 0
 
+    @_async_retry_decorator
+    async def async_hexists(self, name: str, key: str) -> bool:
+        """
+        检查哈希表字段是否存在（异步）
+        
+        检查哈希表中指定字段是否存在。
+        
+        Args:
+            name: 哈希表名
+            key: 字段名
+            
+        Returns:
+            bool: 字段是否存在
+        """
+        try:
+            return await self.async_.hexists(name, key)
+        except Exception as e:
+            logger.error(f"Failed to hexists for hash {name}, key {key}: {str(e)}")
+            return False
+
+    @_async_retry_decorator
+    async def async_hlen(self, name: str) -> int:
+        """
+        获取哈希表字段数量（异步）
+        
+        获取哈希表中字段的数量。
+        
+        Args:
+            name: 哈希表名
+            
+        Returns:
+            int: 字段数量
+        """
+        try:
+            return await self.async_.hlen(name)
+        except Exception as e:
+            logger.error(f"Failed to hlen for hash {name}: {str(e)}")
+            return 0
+
+    @_async_retry_decorator
+    async def async_hkeys(self, name: str) -> List[str]:
+        """
+        获取哈希表所有字段名（异步）
+        
+        获取哈希表中所有字段的名称。
+        
+        Args:
+            name: 哈希表名
+            
+        Returns:
+            List[str]: 字段名列表
+        """
+        try:
+            keys = await self.async_.hkeys(name)
+            return [k.decode() if isinstance(k, bytes) else k for k in keys]
+        except Exception as e:
+            logger.error(f"Failed to hkeys for hash {name}: {str(e)}")
+            return []
+
+    @_async_retry_decorator
+    async def async_hvals(self, name: str) -> List[Any]:
+        """
+        获取哈希表所有字段值（异步）
+        
+        获取哈希表中所有字段的值，并自动反序列化。
+        
+        Args:
+            name: 哈希表名
+            
+        Returns:
+            List[Any]: 字段值列表
+        """
+        try:
+            values = await self.async_.hvals(name)
+            return [self._deserialize(v) for v in values]
+        except Exception as e:
+            logger.error(f"Failed to hvals for hash {name}: {str(e)}")
+            return []
+
+    @_async_retry_decorator
+    async def async_hincrby(self, name: str, key: str, increment: int) -> int:
+        """
+        哈希表字段值增加指定整数（异步）
+        
+        将哈希表中指定字段的值增加指定的整数。
+        
+        Args:
+            name: 哈希表名
+            key: 字段名
+            increment: 增量值
+            
+        Returns:
+            int: 增加后的值
+        """
+        try:
+            return await self.async_.hincrby(name, key, increment)
+        except Exception as e:
+            logger.error(f"Failed to hincrby for hash {name}, key {key}, increment {increment}: {str(e)}")
+            raise
+
+    @_async_retry_decorator
+    async def async_hmget(self, name: str, keys: List[str]) -> Dict[str, Any]:
+        """
+        获取哈希表多个字段值（异步）
+        
+        获取哈希表中多个字段的值，并自动反序列化。
+        
+        Args:
+            name: 哈希表名
+            keys: 字段名列表
+            
+        Returns:
+            Dict[str, Any]: 字段值字典
+        """
+        try:
+            values = await self.async_.hmget(name, keys)
+            result = {}
+            for i, key in enumerate(keys):
+                result[key] = self._deserialize(values[i]) if i < len(values) else None
+            return result
+        except Exception as e:
+            logger.error(f"Failed to hmget for hash {name}, keys {keys}: {str(e)}")
+            return {}
+
+    @_async_retry_decorator
+    async def async_hsetnx(self, name: str, key: str, value: Any) -> bool:
+        """
+        仅当字段不存在时设置哈希表字段值（异步）
+        
+        只有当指定字段不存在时，才为哈希表中的字段设置值。
+        
+        Args:
+            name: 哈希表名
+            key: 字段名
+            value: 字段值
+            
+        Returns:
+            bool: 设置成功返回True，字段已存在返回False
+        """
+        try:
+            serialized_value = self._serialize(value)
+            return await self.async_.hsetnx(name, key, serialized_value)
+        except Exception as e:
+            logger.error(f"Failed to hsetnx for hash {name}, key {key}: {str(e)}")
+            return False
+
+    @_async_retry_decorator
+    async def async_hscan(self, name: str, cursor: int = 0, match: Optional[str] = None, count: Optional[int] = None) -> Tuple[int, Dict[str, Any]]:
+        """
+        增量迭代哈希表中的字段（异步）
+        
+        用于增量迭代哈希表中的字段和值。
+        
+        Args:
+            name: 哈希表名
+            cursor: 游标
+            match: 匹配模式
+            count: 每次迭代返回的元素数量提示
+            
+        Returns:
+            Tuple[int, Dict[str, Any]]: (新游标, 字段值字典)
+        """
+        try:
+            new_cursor, result = await self.async_.hscan(name, cursor=cursor, match=match, count=count)
+            deserialized_result = {
+                k.decode() if isinstance(k, bytes) else k: 
+                self._deserialize(v) for k, v in result.items()
+            }
+            return new_cursor, deserialized_result
+        except Exception as e:
+            logger.error(f"Failed to hscan for hash {name}: {str(e)}")
+            return 0, {}
+
     # ------------------------------
     # List 类型操作 - 异步版
     # ------------------------------
