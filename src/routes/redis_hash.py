@@ -10,11 +10,13 @@ class SingleFieldRequest(BaseModel):
     name: str
     key: str
     value: Any
+    expire: Optional[int] = None
 
 
 class MultipleFieldsRequest(BaseModel):
     name: str
     mapping: Dict[str, Any]
+    expire: Optional[int] = None
 
 
 @router.post("/hset")
@@ -28,6 +30,7 @@ async def hset_hash_field(request: Union[SingleFieldRequest, MultipleFieldsReque
     3. 支持单个字段设置或批量字段设置
     4. 包含错误处理和日志记录
     5. 使用重试机制提高可靠性
+    6. 支持设置过期时间（expire参数）
     
     注意：Redis 4.0.0+版本中，HSET已完全替代HMSET功能，支持设置单个或多个字段
     
@@ -36,7 +39,8 @@ async def hset_hash_field(request: Union[SingleFieldRequest, MultipleFieldsReque
        {
          "name": "user:1000",
          "key": "name",
-         "value": "Alice"
+         "value": "Alice",
+         "expire": 3600
        }
        
     2. 批量设置多个字段：
@@ -46,22 +50,24 @@ async def hset_hash_field(request: Union[SingleFieldRequest, MultipleFieldsReque
            "name": "Bob",
            "age": 30,
            "email": "bob@example.com"
-           "mapping": {
-             "name": "Bob",
-             "age": 30,
-             "email": "bob@example.com"
-           }
-         }
+         },
+         "expire": 3600
        }
     """
     # 检查请求类型
     if hasattr(request, 'mapping') and request.mapping is not None:
         # 批量设置模式
         result = await redis_client.async_hset(request.name, mapping=request.mapping)
+        # 如果指定了过期时间，则设置过期时间
+        if hasattr(request, 'expire') and request.expire is not None:
+            await redis_client.async_expire(request.name, request.expire)
         return {"success": result > 0, "hash": request.name, "mapping": request.mapping}
     elif hasattr(request, 'key') and hasattr(request, 'value'):
         # 单字段设置模式
         result = await redis_client.async_hset(request.name, request.key, request.value)
+        # 如果指定了过期时间，则设置过期时间
+        if hasattr(request, 'expire') and request.expire is not None:
+            await redis_client.async_expire(request.name, request.expire)
         return {"success": result > 0, "hash": request.name, "field": request.key, "value": request.value}
     else:
         return {"success": False, "error": "请求参数不正确"}
@@ -71,7 +77,8 @@ async def hset_hash_field(request: Union[SingleFieldRequest, MultipleFieldsReque
 async def hsetnx_hash_field(
     name: str = Body(..., description="哈希表名"),
     key: str = Body(..., description="字段名"),
-    value: Any = Body(..., description="字段值")
+    value: Any = Body(..., description="字段值"),
+    expire: Optional[int] = Body(None, description="过期时间（秒）")
 ):
     """
     仅当字段不存在时设置哈希表字段值
@@ -82,6 +89,7 @@ async def hsetnx_hash_field(
     3. 仅当字段不存在时才设置
     4. 包含错误处理和日志记录
     5. 使用重试机制提高可靠性
+    6. 支持设置过期时间（expire参数）
     
     应用场景：
     - 分布式锁实现
@@ -89,6 +97,9 @@ async def hsetnx_hash_field(
     - 唯一性约束检查
     """
     result = await redis_client.async_hsetnx(name, key, value)
+    # 如果设置成功且指定了过期时间，则设置过期时间
+    if result and expire is not None:
+        await redis_client.async_expire(name, expire)
     return {"success": result, "hash": name, "field": key, "value": value}
 
 
