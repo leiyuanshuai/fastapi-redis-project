@@ -1003,6 +1003,207 @@ class RedisClient:
             logger.error(f"Failed to llen for list {name}: {str(e)}")
             return 0
 
+    @_async_retry_decorator
+    async def async_lindex(self, name: str, index: int) -> Any:
+        """
+        获取列表中指定索引的元素（异步）
+        
+        获取列表中指定索引位置的元素，索引从0开始，负数索引从末尾开始计算。
+        
+        Args:
+            name: 列表名
+            index: 索引位置
+            
+        Returns:
+            Any: 元素值
+        """
+        try:
+            result = await self.async_.lindex(name, index)
+            return self._deserialize(result)
+        except Exception as e:
+            logger.error(f"Failed to lindex for list {name}, index {index}: {str(e)}")
+            return None
+
+    @_async_retry_decorator
+    async def async_lset(self, name: str, index: int, value: Any) -> bool:
+        """
+        设置列表中指定索引的元素值（异步）
+        
+        设置列表中指定索引位置的元素值。
+        
+        Args:
+            name: 列表名
+            index: 索引位置
+            value: 要设置的值
+            
+        Returns:
+            bool: 是否设置成功
+        """
+        try:
+            serialized_value = self._serialize(value)
+            await self.async_.lset(name, index, serialized_value)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to lset for list {name}, index {index}: {str(e)}")
+            return False
+
+    @_async_retry_decorator
+    async def async_lrange(self, name: str, start: int, end: int) -> List[Any]:
+        """
+        获取列表中指定范围的元素（异步）
+        
+        返回列表中指定范围内的元素，范围包含start和end。
+        
+        Args:
+            name: 列表名
+            start: 起始索引
+            end: 结束索引
+            
+        Returns:
+            List[Any]: 元素列表
+        """
+        try:
+            result = await self.async_.lrange(name, start, end)
+            return [self._deserialize(item) for item in result]
+        except Exception as e:
+            logger.error(f"Failed to lrange for list {name}, start {start}, end {end}: {str(e)}")
+            return []
+
+    @_async_retry_decorator
+    async def async_linsert(self, name: str, where: str, refvalue: Any, value: Any) -> int:
+        """
+        在列表中指定元素的前后插入元素（异步）
+        
+        在列表中第一个匹配refvalue的元素前后插入value。
+        
+        Args:
+            name: 列表名
+            where: 插入位置，'BEFORE'或'AFTER'
+            refvalue: 参考值
+            value: 要插入的值
+            
+        Returns:
+            int: 列表长度，-1表示参考值未找到
+        """
+        try:
+            serialized_refvalue = self._serialize(refvalue)
+            serialized_value = self._serialize(value)
+            return await self.async_.linsert(name, where.upper(), serialized_refvalue, serialized_value)
+        except Exception as e:
+            logger.error(f"Failed to linsert for list {name}: {str(e)}")
+            return -1
+
+    @_async_retry_decorator
+    async def async_lrem(self, name: str, count: int, value: Any) -> int:
+        """
+        移除列表中指定值的元素（异步）
+        
+        移除列表中前count个值为value的元素。
+        count > 0: 从头开始移除count个元素
+        count < 0: 从尾开始移除-count个元素
+        count = 0: 移除所有值为value的元素
+        
+        Args:
+            name: 列表名
+            count: 移除元素的数量
+            value: 要移除的值
+            
+        Returns:
+            int: 被移除的元素数量
+        """
+        try:
+            serialized_value = self._serialize(value)
+            return await self.async_.lrem(name, count, serialized_value)
+        except Exception as e:
+            logger.error(f"Failed to lrem for list {name}, count {count}: {str(e)}")
+            return 0
+
+    @_async_retry_decorator
+    async def async_ltrim(self, name: str, start: int, end: int) -> bool:
+        """
+        修剪列表，只保留指定范围内的元素（异步）
+        
+        修剪列表，只保留指定范围内的元素，范围包含start和end。
+        
+        Args:
+            name: 列表名
+            start: 起始索引
+            end: 结束索引
+            
+        Returns:
+            bool: 是否修剪成功
+        """
+        try:
+            await self.async_.ltrim(name, start, end)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to ltrim for list {name}, start {start}, end {end}: {str(e)}")
+            return False
+
+    @_async_retry_decorator
+    async def async_blpop(self, *keys: str, timeout: int = 0) -> Optional[List[bytes]]:
+        """
+        移除并返回第一个非空列表的第一个元素（阻塞式）（异步）
+        
+        从左到右检查keys列表中的所有列表，如果所有列表都为空，
+        则阻塞连接直到超时或某个列表非空。
+        
+        Args:
+            keys: 列表名列表
+            timeout: 超时时间（秒），0表示无限等待
+            
+        Returns:
+            Optional[List[bytes]]: [列表名, 元素值]或None（超时）
+        """
+        try:
+            return await self.async_.blpop(*keys, timeout=timeout)
+        except Exception as e:
+            logger.error(f"Failed to blpop for keys {keys}: {str(e)}")
+            return None
+
+    @_async_retry_decorator
+    async def async_brpop(self, *keys: str, timeout: int = 0) -> Optional[List[bytes]]:
+        """
+        移除并返回第一个非空列表的最后一个元素（阻塞式）（异步）
+        
+        从左到右检查keys列表中的所有列表，如果所有列表都为空，
+        则阻塞连接直到超时或某个列表非空。
+        
+        Args:
+            keys: 列表名列表
+            timeout: 超时时间（秒），0表示无限等待
+            
+        Returns:
+            Optional[List[bytes]]: [列表名, 元素值]或None（超时）
+        """
+        try:
+            return await self.async_.brpop(*keys, timeout=timeout)
+        except Exception as e:
+            logger.error(f"Failed to brpop for keys {keys}: {str(e)}")
+            return None
+
+    @_async_retry_decorator
+    async def async_brpoplpush(self, source: str, destination: str, timeout: int = 0) -> Any:
+        """
+        从源列表弹出最后一个元素并推入目标列表头部（阻塞式）（异步）
+        
+        原子性地从source列表尾部弹出一个元素并推入destination列表头部。
+        
+        Args:
+            source: 源列表名
+            destination: 目标列表名
+            timeout: 超时时间（秒），0表示无限等待
+            
+        Returns:
+            Any: 被移动的元素，超时返回None
+        """
+        try:
+            result = await self.async_.brpoplpush(source, destination, timeout=timeout)
+            return self._deserialize(result)
+        except Exception as e:
+            logger.error(f"Failed to brpoplpush from {source} to {destination}: {str(e)}")
+            return None
+
     # ------------------------------
     # Set 类型操作 - 异步版
     # ------------------------------
