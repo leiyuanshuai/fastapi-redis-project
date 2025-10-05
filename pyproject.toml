@@ -1,24 +1,32 @@
 [tool.poetry]
-name = "fastapi-redis-project"
+name = "fastapi-project"
 version = "0.1.0"
-description = "A production-ready FastAPI application with advanced Redis integration"
-authors = ["Your Name <your.email@example.com>"]
+description = "fastapi redis mysql langraph langchain llama-index milvus pyjwt pyjwt python dify sqlmodel pyjwt pydantic"
+authors = ["15001374711@163.com"]
 package-mode = false
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.117.0"
-uvicorn = "^0.24.0"
 redis = "^6.4.0"  # 兼容Redis 7.4+
 pydantic-settings = "^2.1.0"
 loguru = "^0.7.2"
 backoff = "^2.2.1"
 orjson = "^3.9.10"
 python-dotenv = "^1.0.0"
+langserve = {extras = ["server"], version = "^0.3.2"}
+sqlmodel = "^0.0.25"
+pyjwt = "^2.10.1"
+python-multipart = "^0.0.20"
+asyncmy = "^0.2.10"
+passlib = "^1.7.4"
+langgraph = "^0.6.8"
+langgraph-checkpoint-postgres = "^2.0.24"
+aiofiles = "^24.1.0"
+
+[tool.poetry.group.dev.dependencies]
+greenlet = "^3.2.4"
 
 [poetry.group.dev.dependencies]
-pytest = "^7.4.3"
-httpx = "^0.25.1"
-pytest-asyncio = "^0.21.1"
+
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

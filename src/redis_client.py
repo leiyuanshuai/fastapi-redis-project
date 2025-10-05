@@ -2,7 +2,7 @@ import redis.asyncio as aredis
 from redis.asyncio.cluster import RedisCluster as ARedisCluster
 from loguru import logger
 from typing import Optional, Union, Any, List, Dict, Tuple, Callable, Awaitable
-from src.config import settings
+from src.config.env import settings
 import backoff
 import orjson
 from datetime import timedelta
@@ -47,7 +47,7 @@ class RedisClient:
         - 否则初始化单机模式
         """
         try:
-            if settings.redis.is_cluster and settings.redis.cluster_nodes:
+            if settings.is_cluster and settings.cluster_nodes:
                 # 初始化集群客户端
                 self._init_cluster_clients()
             else:
@@ -73,18 +73,18 @@ class RedisClient:
         """
         # 异步连接池
         async_pool = aredis.ConnectionPool(
-            host=settings.redis.host,
-            port=settings.redis.port,
-            password=settings.redis.password,
-            db=settings.redis.db,
-            decode_responses=settings.redis.decode_responses,
-            max_connections=settings.redis.max_connections,
-            socket_timeout=settings.redis.socket_timeout,
-            retry_on_timeout=settings.redis.retry_on_timeout
+            host=settings.host,
+            port=settings.port,
+            password=settings.password,
+            db=settings.db,
+            decode_responses=settings.decode_responses,
+            max_connections=settings.max_connections,
+            socket_timeout=settings.socket_timeout,
+            retry_on_timeout=settings.retry_on_timeout
         )
         self._async_client = aredis.Redis(connection_pool=async_pool)
 
-        logger.info(f"Standalone Redis clients initialized for {settings.redis.host}:{settings.redis.port}")
+        logger.info(f"Standalone Redis clients initialized for {settings.host}:{settings.port}")
 
     def _init_cluster_clients(self) -> None:
         """
@@ -100,15 +100,15 @@ class RedisClient:
         """
         # 异步集群客户端
         self._async_client = ARedisCluster(
-            startup_nodes=settings.redis.cluster_nodes,
-            password=settings.redis.password,
-            decode_responses=settings.redis.decode_responses,
-            max_connections=settings.redis.max_connections,
-            socket_timeout=settings.redis.socket_timeout,
-            retry_on_timeout=settings.redis.retry_on_timeout
+            startup_nodes=settings.cluster_nodes,
+            password=settings.password,
+            decode_responses=settings.decode_responses,
+            max_connections=settings.max_connections,
+            socket_timeout=settings.socket_timeout,
+            retry_on_timeout=settings.retry_on_timeout
         )
 
-        logger.info(f"Redis Cluster clients initialized with nodes: {settings.redis.cluster_nodes}")
+        logger.info(f"Redis Cluster clients initialized with nodes: {settings.cluster_nodes}")
 
     @property
     def async_(self) -> Union[aredis.Redis, ARedisCluster]:
@@ -163,9 +163,9 @@ class RedisClient:
         @backoff.on_exception(
             backoff.expo,
             (aredis.RedisError, ConnectionError),
-            max_tries=settings.redis.retry_attempts,
+            max_tries=settings.retry_attempts,
             base=2,
-            factor=settings.redis.retry_delay,
+            factor=settings.retry_delay,
             jitter=backoff.full_jitter
         )
         async def wrapper(self, *args, **kwargs):
